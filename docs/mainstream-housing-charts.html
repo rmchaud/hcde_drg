@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bay Area housing cost pressure (mainstream framing)</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 960px; margin: 0 auto; padding: 16px; color: #1c1b19; background: #fafafa; }
+    h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+    h2 { font-size: 1.1rem; margin: 1.75rem 0 0.5rem; font-family: system-ui, sans-serif; }
+    .muted { font-size: 0.85rem; color: #555; max-width: 52rem; }
+    .chart-box { background: #fff; border: 1px solid #ccc; padding: 12px; margin: 10px 0; overflow-x: auto; }
+    svg { display: block; max-width: 100%; height: auto; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 0.72rem; font-family: system-ui, sans-serif; margin-top: 8px; }
+    .legend span { display: inline-flex; align-items: center; gap: 4px; }
+    .sw { width: 10px; height: 10px; border-radius: 1px; }
+    .stat { font-family: system-ui, sans-serif; font-size: 2rem; font-weight: 700; color: #1a4d6e; }
+    .stat-label { font-size: 0.85rem; color: #444; max-width: 18rem; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+    @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+    nav { font-size: 0.85rem; margin-bottom: 1rem; font-family: system-ui, sans-serif; }
+    nav a { color: #1a4d6e; }
+  </style>
+</head>
+<body>
+  <nav><a href="index.html">← All visualizations</a></nav>
+  <h1>Bay Area housing cost pressure</h1>
+  <p class="muted">
+    Source: Vital Signs &ldquo;Housing Affordability&rdquo; extracts (ACS). These tables describe housing-cost-to-income
+    shares, not median rent, home prices, tech employment, or population. A rising line means a larger share of
+    renter households pay at least 35% of income on housing. Static page for GitHub Pages (same data as
+    <code>output/bay-area-housing-vital-signs.canvas.tsx</code> in Cursor).
+  </p>
+
+  <h2>Renters: share paying ≥35% of income on housing, by county</h2>
+  <div class="chart-box"><svg id="svgCounties" viewBox="0 0 720 300" preserveAspectRatio="xMidYMid meet"></svg><div class="legend" id="legCounties"></div></div>
+
+  <h2>Nine-county region: renters vs owners (≥35% of income)</h2>
+  <div class="chart-box"><svg id="svgRegion" viewBox="0 0 720 300" preserveAspectRatio="xMidYMid meet"></svg><div class="legend" id="legRegion"></div></div>
+  <p class="muted">Regional renter severe-burden share is roughly flat; owner share declines in this series—tenure and mortgage dynamics, not a direct read on dollar rents or prices.</p>
+
+  <h2>2024 snapshot: housing stress by household income (region)</h2>
+  <div class="grid2">
+    <div class="chart-box"><svg id="svgBars" viewBox="0 0 400 220" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <div>
+      <div class="stat">9.8%</div>
+      <p class="stat-label">Households earning $100k+ paying ≥35% on housing (2024), nine-county region.</p>
+      <p class="muted" style="margin-top:12px;">Tech employment and population are not in these extracts. By-income files are 2024-only in this bundle.</p>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  var YEARS = ["2009","2010","2011","2012","2013","2014","2015","2016","2017","2018","2019","2020","2021","2022","2023","2024"];
+  var COUNTY = {
+    Alameda: [38.8,44.2,43.7,43.4,42.9,41.7,41.5,40.2,40.1,40.3,38.7,39.5,41.4,43.5,43.7,42.9],
+    "Contra Costa": [44.7,46.4,47.6,46.5,45.2,44.9,43.3,43.0,45.2,44.3,41.3,43.5,50.4,47.5,46.7,48.9],
+    Marin: [45.4,51.4,47.9,46.6,42.9,44.8,37.5,42.5,46.6,42.0,42.2,41.6,51.3,43.6,46.3,47.2],
+    Napa: [38.6,42.5,44.3,42.7,40.5,44.4,44.2,41.9,42.5,44.0,42.5,43.2,44.4,43.3,43.3,44.9],
+    "San Francisco": [37.2,36.5,36.9,38.7,36.2,35.3,32.0,30.9,28.4,28.4,24.3,29.0,34.0,29.9,31.6,31.3],
+    "San Mateo": [42.2,37.7,43.4,44.3,41.6,41.3,42.0,40.6,41.3,40.1,37.7,39.7,42.8,43.5,39.2,37.2],
+    "Santa Clara": [37.1,38.0,39.1,39.7,40.6,39.7,39.2,37.1,38.0,36.4,36.2,36.1,34.7,37.0,37.4,36.9],
+    Solano: [47.3,46.2,45.2,48.6,50.4,42.4,50.0,41.8,43.4,40.2,40.7,42.9,49.5,50.1,47.1,49.4],
+    Sonoma: [43.9,49.7,48.1,48.3,47.2,44.6,44.5,45.3,46.1,45.8,41.6,44.5,44.9,42.5,44.6,44.5]
+  };
+  var REGION_RENTER = [40.0,41.7,42.3,42.8,41.9,40.8,40.0,38.6,38.8,37.9,36.0,37.8,40.6,40.1,40.0,39.9];
+  var REGION_OWNER = [32.8,32.1,30.3,27.4,24.7,23.7,23.3,23.1,22.6,21.9,21.4,22.5,22.8,22.7,23.8,23.7];
+  var INCOME = [
+    { label: "Under $10k", v: 95.4 }, { label: "$10k–$20k", v: 81.1 }, { label: "$20k–$35k", v: 80.8 },
+    { label: "$35k–$50k", v: 72.2 }, { label: "$50k–$75k", v: 61.9 }, { label: "$75k–$100k", v: 42.5 }, { label: "$100k+", v: 9.8 }
+  ];
+  var COLORS = ["#1a4d6e","#8b2942","#2d6a4f","#bc6c25","#6c3483","#118ab2","#ef476f","#073b4c","#cb997e"];
+  var names = Object.keys(COUNTY);
+
+  function lineChart(svg, seriesList, ymin, ymax) {
+    var W = 720, H = 300, padL = 48, padR = 16, padT = 16, padB = 44;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var n = YEARS.length;
+    function x(i) { return padL + (i / (n - 1)) * iw; }
+    function y(v) { return padT + ih - ((v - ymin) / (ymax - ymin)) * ih; }
+    var ns = "http://www.w3.org/2000/svg";
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var gGrid = document.createElementNS(ns, "g");
+    gGrid.setAttribute("stroke", "#e0e0e0");
+    for (var gv = 20; gv <= ymax; gv += 10) {
+      var el = document.createElementNS(ns, "line");
+      el.setAttribute("x1", padL); el.setAttribute("x2", W - padR);
+      el.setAttribute("y1", y(gv)); el.setAttribute("y2", y(gv));
+      gGrid.appendChild(el);
+    }
+    svg.appendChild(gGrid);
+    var gAx = document.createElementNS(ns, "g");
+    gAx.setAttribute("fill", "#333");
+    gAx.setAttribute("font-size", "11");
+    gAx.setAttribute("font-family", "system-ui,sans-serif");
+    for (var t = 0; t < n; t += 2) {
+      var tx = document.createElementNS(ns, "text");
+      tx.setAttribute("x", x(t)); tx.setAttribute("y", H - 12);
+      tx.setAttribute("text-anchor", "middle");
+      tx.textContent = YEARS[t];
+      gAx.appendChild(tx);
+    }
+    for (var gv = 20; gv <= ymax; gv += 10) {
+      var ty = document.createElementNS(ns, "text");
+      ty.setAttribute("x", 6); ty.setAttribute("y", y(gv) + 4);
+      ty.textContent = gv + "%";
+      gAx.appendChild(ty);
+    }
+    svg.appendChild(gAx);
+    seriesList.forEach(function (s, si) {
+      var pts = s.data.map(function (v, i) { return x(i) + "," + y(v); }).join(" ");
+      var pl = document.createElementNS(ns, "polyline");
+      pl.setAttribute("fill", "none");
+      pl.setAttribute("stroke", s.color);
+      pl.setAttribute("stroke-width", s.wide ? "2.5" : "1.5");
+      pl.setAttribute("points", pts);
+      svg.appendChild(pl);
+      s.data.forEach(function (v, i) {
+        var c = document.createElementNS(ns, "circle");
+        c.setAttribute("cx", x(i)); c.setAttribute("cy", y(v)); c.setAttribute("r", s.wide ? "4" : "2.5");
+        c.setAttribute("fill", s.color);
+        svg.appendChild(c);
+      });
+    });
+  }
+
+  var series = names.map(function (nm, i) {
+    return { name: nm, data: COUNTY[nm], color: COLORS[i % COLORS.length] };
+  });
+  lineChart(document.getElementById("svgCounties"), series, 20, 55);
+  var legC = document.getElementById("legCounties");
+  series.forEach(function (s) {
+    var sp = document.createElement("span");
+    sp.innerHTML = '<span class="sw" style="background:' + s.color + '"></span> ' + s.name;
+    legC.appendChild(sp);
+  });
+
+  lineChart(document.getElementById("svgRegion"), [
+    { name: "Renters", data: REGION_RENTER, color: "#1a4d6e", wide: true },
+    { name: "Owners", data: REGION_OWNER, color: "#666", wide: true }
+  ], 18, 46);
+  var legR = document.getElementById("legRegion");
+  [{ n: "Renters", c: "#1a4d6e" }, { n: "Owners", c: "#666" }].forEach(function (s) {
+    var sp = document.createElement("span");
+    sp.innerHTML = '<span class="sw" style="background:' + s.c + '"></span> ' + s.n;
+    legR.appendChild(sp);
+  });
+
+  var svgB = document.getElementById("svgBars");
+  var ns = "http://www.w3.org/2000/svg";
+  var rowH = 26, labW = 88, maxV = 100, barW = 400 - labW - 48;
+  INCOME.forEach(function (row, i) {
+    var yy = 10 + i * rowH;
+    var t = document.createElementNS(ns, "text");
+    t.setAttribute("x", 4); t.setAttribute("y", yy + 16);
+    t.setAttribute("font-size", "10");
+    t.setAttribute("font-family", "system-ui,sans-serif");
+    t.setAttribute("fill", "#444");
+    t.textContent = row.label;
+    svgB.appendChild(t);
+    var w = (row.v / maxV) * barW;
+    var r = document.createElementNS(ns, "rect");
+    r.setAttribute("x", labW); r.setAttribute("y", yy + 4);
+    r.setAttribute("width", w); r.setAttribute("height", 18);
+    r.setAttribute("fill", "#444");
+    svgB.appendChild(r);
+    var tv = document.createElementNS(ns, "text");
+    tv.setAttribute("x", labW + w + 6); tv.setAttribute("y", yy + 16);
+    tv.setAttribute("font-size", "10");
+    tv.setAttribute("font-family", "system-ui,sans-serif");
+    tv.textContent = row.v + "%";
+    svgB.appendChild(tv);
+  });
+})();
+  </script>
+</body>
+</html>

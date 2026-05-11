@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Housing burden, inequality, and what this data can (and cannot) show</title>
+  <style>
+    :root {
+      --bg: #f6f4f1;
+      --panel: #fff;
+      --ink: #1c1b19;
+      --muted: #5c5854;
+      --accent: #8b2942;
+      --accent-soft: #f0e4e8;
+      --callout-border: #2c5282;
+      --warn: #744210;
+      --warn-bg: #fff9e6;
+      --font: "Georgia", "Times New Roman", serif;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+    header {
+      background: var(--ink);
+      color: #fff;
+      padding: 1.75rem 1.25rem 2rem;
+    }
+    header h1 {
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 1.65rem;
+      margin: 0 0 0.5rem;
+      max-width: 52rem;
+    }
+    header .lede {
+      max-width: 52rem;
+      opacity: 0.92;
+      font-size: 0.98rem;
+    }
+    main {
+      max-width: 58rem;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 3rem;
+    }
+    h2 {
+      font-family: var(--font);
+      font-size: 1.2rem;
+      margin: 2rem 0 0.75rem;
+      color: var(--ink);
+    }
+    h3 {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin: 1.5rem 0 0.5rem;
+    }
+    .callout {
+      border-left: 4px solid var(--callout-border);
+      background: var(--panel);
+      padding: 1rem 1.1rem;
+      margin: 1rem 0;
+    }
+    .callout strong { color: var(--callout-border); }
+    .callout.author {
+      border-left-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .callout.author strong { color: var(--accent); }
+    .warn {
+      background: var(--warn-bg);
+      color: var(--warn);
+      padding: 0.85rem 1rem;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      margin: 1rem 0 0.5rem;
+    }
+    .controls label { font-size: 0.85rem; color: var(--muted); }
+    input[type="range"] { width: min(100%, 320px); }
+    .layer-toggle {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .layer-toggle button {
+      font: inherit;
+      cursor: pointer;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 2px;
+    }
+    .layer-toggle button.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .map-wrap {
+      background: var(--panel);
+      padding: 1rem;
+      margin: 0.5rem 0 1.5rem;
+      border: 1px solid #ddd;
+    }
+    .map-layout {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+    .county-cell {
+      position: relative;
+      min-height: 88px;
+      padding: 8px;
+      border: 1px solid #bbb;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      transition: background 0.15s ease;
+    }
+    .county-cell .name {
+      font-weight: 700;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+    .county-cell .val {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 10px;
+      justify-content: center;
+    }
+    .legend-bar {
+      display: flex;
+      height: 10px;
+      width: 120px;
+      border: 1px solid #ccc;
+      overflow: hidden;
+    }
+    .legend-bar span {
+      flex: 1;
+      height: 100%;
+    }
+    .legend-bar .lo { background: #eee; }
+    .legend-bar .hi { background: #6b1f2a; }
+    .legend-bar.delta .down { background: #1a4d6e; flex: 1; }
+    .legend-bar.delta .mid { background: #eee; flex: 1; }
+    .legend-bar.delta .up { background: #6b1f2a; flex: 1; }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 720px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    .income-bars {
+      background: var(--panel);
+      border: 1px solid #ddd;
+      padding: 1rem;
+    }
+    .income-bars h4 { margin: 0 0 0.75rem; font-size: 1rem; }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 0.78rem;
+    }
+    .bar-row span:first-child { width: 118px; flex-shrink: 0; color: var(--muted); }
+    .bar-track {
+      flex: 1;
+      height: 14px;
+      background: #eee;
+      position: relative;
+    }
+    .bar-fill {
+      height: 100%;
+      background: #444;
+    }
+    .bar-fill.severe { background: var(--accent); }
+    .sources {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .sources a { color: var(--callout-border); }
+    ul.insights { margin: 0.5rem 0 0 1.1rem; padding: 0; }
+    ul.insights li { margin-bottom: 0.35rem; }
+    nav.hub { font-family: var(--sans); font-size: 0.85rem; padding: 0.6rem 1rem; background: #eae8e4; }
+    nav.hub a { color: var(--callout-border); }
+  </style>
+</head>
+<body>
+  <nav class="hub"><a href="index.html">← All visualizations</a></nav>
+    <header>
+    <h1>The housing crisis is unequal and political</h1>
+    <p class="lede">
+      This page is a <strong>counter-visualization</strong> to county-average “trend lines” alone: it foregrounds
+      <strong>who</strong> carries housing cost stress, <strong>where</strong> geography in our local files stops
+      (counties—not neighborhoods), and <strong>what you must add next</strong> (race, tracts, vouchers) from
+      regional and state sources.
+    </p>
+  </header>
+
+  <main>
+    <div class="warn">
+      <strong>Data scope (files in <code>data/raw/</code>):</strong>
+      All five CSVs are ACS-derived <strong>housing cost burden</strong> tabulations at
+      <strong>region or county</strong> level. They do <em>not</em> include census tracts, race/ethnicity,
+      Section&nbsp;8 / HCV rates, or MTC-style displacement indicators. The map below is a
+      <strong>schematic county layout</strong>, not a georeferenced basemap. Neighborhood claims require
+      additional downloads (see sources at bottom).
+    </div>
+
+    <div class="callout author">
+      <strong>Author read:</strong> The sharpest inequality signal in <em>these</em> tables is income-stratified
+      burden: households reporting under $10,000 in income are overwhelmingly paying more than half of that income
+      on housing in every Bay Area county in the 2024 extract—while households at $100,000+ are not. That pattern
+      is structural; maps of “hot markets” without poverty and race layers erase the people most exposed.
+    </div>
+
+    <h2>1. County schematic + timeline</h2>
+    <p class="sources">
+      <strong>Drawn from:</strong>
+      <code>Vital_Signs__Housing_Affordability_-_Counties_20260506.csv</code> (renter household shares by burden
+      bucket, 2009–2024), plus county-by-income 2024 detail from
+      <code>Vital_Signs__Housing_Affordability_-_Counties_(By_Income)_20260506.csv</code>,
+      <code>Vital_Signs__Housing_Affordability_-_Region_20260506.csv</code>,
+      <code>Vital_Signs__Housing_Affordability_-_Region_(By_Income)_20260506.csv</code>, and the parallel
+      <code>Housing Affordability - … Region (by income).csv</code> export.
+    </p>
+
+    <div class="controls">
+      <div>
+        <label for="yearSlider"><span id="yearLabel">Year: 2009</span></label><br />
+        <input id="yearSlider" type="range" min="0" max="15" value="0" />
+      </div>
+      <div class="layer-toggle" id="layerToggle">
+        <button type="button" data-layer="burden" class="active">Renters: share paying ≥35% of income on housing</button>
+        <button type="button" data-layer="delta">Change in that share, 2009 → 2024</button>
+        <button type="button" data-layer="income">2024 layer: low-income &gt;30% vs high-earner &gt;30%</button>
+      </div>
+    </div>
+
+    <div class="map-wrap">
+      <div class="map-layout" id="countyMap" aria-label="Schematic nine-county map"></div>
+      <div class="legend" id="legendBurden">
+        <span>Lighter</span>
+        <div class="legend-bar" aria-hidden="true"><span class="lo"></span><span class="hi"></span></div>
+        <span>Higher renter share ≥35%</span>
+      </div>
+      <div class="legend" id="legendDelta" style="display:none;">
+        <span>↓ burden (’09→’24)</span>
+        <div class="legend-bar delta" aria-hidden="true"><span class="down"></span><span class="mid"></span><span class="up"></span></div>
+        <span>↑ burden</span>
+      </div>
+      <div class="legend" id="legendIncome" style="display:none;">
+        <span>Dual: gap between households under $10k vs $100k+ paying &gt;30% on housing (2024)</span>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Callout — who is most affected (income, within these files):</strong>
+      For households with reported income under <strong>$10,000</strong>, the share paying
+      <strong>more than 30%</strong> of income on housing is roughly <strong>91–100%</strong> across counties in
+      2024; the share paying <strong>more than 50%</strong> is typically in the <strong>high 80s to high 90s
+      percent</strong>. At <strong>$100,000 or more</strong>, the same “&gt;30%” shares fall to roughly
+      <strong>13–20%</strong>. That wedge is the ethical center of the story these spreadsheets support.
+    </div>
+
+    <div class="callout">
+      <strong>Callout — where “displacement” is <em>not</em> visible here:</strong>
+      Declining Black or Latino population share in a given neighborhood, or rising median rent at the block level,
+      cannot be read from county aggregates. Several counties show <em>lower</em> renter severe-burden shares in
+      2024 than in 2009 (e.g. San Francisco in this tabulation)—which does not disprove displacement pressure; it
+      reflects composition, incomes, who remains a renter, and ACS methodology. Tract maps are required for spatial
+      displacement claims.
+    </div>
+
+    <h2>2. Income ladder for selected county (2024)</h2>
+    <p>Click a county on the schematic (under the “2024 layer” mode, any mode sets selection). Bars show estimated
+      share of households in that income band paying <strong>more than 30%</strong> of income on housing (darker)
+      and <strong>more than 50%</strong> (red overlay).</p>
+    <div class="grid-2">
+      <div>
+        <label for="countyPick"><strong>County</strong></label><br />
+        <select id="countyPick" style="font:inherit;padding:0.35rem 0.5rem;margin-top:4px;"></select>
+      </div>
+    </div>
+    <div class="income-bars" style="margin-top:1rem;">
+      <h4 id="incomeTitle">Income × housing stress</h4>
+      <div id="incomeBars"></div>
+    </div>
+
+    <h2>3. Your research questions → data we have vs data to add</h2>
+    <ul class="insights">
+      <li><strong>Race/ethnicity and highest burden:</strong> Not in local raw CSVs. Use
+        <a href="https://www.bayareaequityatlas.org/indicators/housing-burden?&amp;geo_compare=02000000000006000">Bay Area Equity Atlas — Housing burden and race</a>
+        (tract or city where available) plus ACS crosswalks.</li>
+      <li><strong>Change over time by race:</strong> Requires longitudinal race × burden tables; see
+        <a href="https://lab.data.ca.gov/dataset/housing-cost-burden">California Housing Cost Burden</a> (state data lab; check geography and vintage).</li>
+      <li><strong>Largest neighborhood demographic shifts:</strong> Needs tract population by race/ethnicity over
+        time (e.g. NHGIS, Census DHC, or
+        <a href="https://mtc.ca.gov/tools-resources/digital-library/bay-area-displacement-housing-and-travel-data-summaryxlsx">MTC Bay Area displacement / housing summary</a>).</li>
+      <li><strong>Section&nbsp;8 / voucher coverage vs displacement risk:</strong> Not in these five files; HUD
+        PIC, Housing Authority dashboards, or regional equity layers are the right join targets.</li>
+      <li><strong>Spatial corridors for lower-income residents:</strong> County maps cannot answer this; tract-level
+        income and rent burden choropleths (Equity Atlas, CHHS) can.</li>
+    </ul>
+
+    <h3>Closing note</h3>
+    <p class="sources">
+      Treat this HTML as a <strong>story scaffold</strong>: the sliders and callouts encode what the Vital Signs
+      extracts actually measure, while external links carry the political and spatial analysis the policy debate
+      requires.
+    </p>
+  </main>
+
+  <script>
+(function () {
+  const DATA = {"years":["2009","2010","2011","2012","2013","2014","2015","2016","2017","2018","2019","2020","2021","2022","2023","2024"],"counties":["Alameda","Contra Costa","Marin","Napa","San Francisco","San Mateo","Santa Clara","Solano","Sonoma"],"renterBurden35":{"Alameda":[38.8,44.2,43.7,43.4,42.9,41.7,41.5,40.2,40.1,40.3,38.7,39.5,41.4,43.5,43.7,42.9],"Contra Costa":[44.7,46.4,47.6,46.5,45.2,44.9,43.3,43.0,45.2,44.3,41.3,43.5,50.4,47.5,46.7,48.9],"Marin":[45.4,51.4,47.9,46.6,42.9,44.8,37.5,42.5,46.6,42.0,42.2,41.6,51.3,43.6,46.3,47.2],"Napa":[38.6,42.5,44.3,42.7,40.5,44.4,44.2,41.9,42.5,44.0,42.5,43.2,44.4,43.3,43.3,44.9],"San Francisco":[37.2,36.5,36.9,38.7,36.2,35.3,32.0,30.9,28.4,28.4,24.3,29.0,34.0,29.9,31.6,31.3],"San Mateo":[42.2,37.7,43.4,44.3,41.6,41.3,42.0,40.6,41.3,40.1,37.7,39.7,42.8,43.5,39.2,37.2],"Santa Clara":[37.1,38.0,39.1,39.7,40.6,39.7,39.2,37.1,38.0,36.4,36.2,36.1,34.7,37.0,37.4,36.9],"Solano":[47.3,46.2,45.2,48.6,50.4,42.4,50.0,41.8,43.4,40.2,40.7,42.9,49.5,50.1,47.1,49.4],"Sonoma":[43.9,49.7,48.1,48.3,47.2,44.6,44.5,45.3,46.1,45.8,41.6,44.5,44.9,42.5,44.6,44.5]},"delta09_24":{"Alameda":4.1,"Contra Costa":4.1,"Marin":1.8,"Napa":6.3,"San Francisco":-5.9,"San Mateo":-5.0,"Santa Clara":-0.1,"Solano":2.1,"Sonoma":0.6},"countyIncome2024":{"Alameda":{"gt30_low":93.9,"gt50_low":91.0,"gt30_high_earn":15.7,"gt50_high_earn":2.2},"Contra Costa":{"gt30_low":98.5,"gt50_low":98.0,"gt30_high_earn":19.2,"gt50_high_earn":3.1},"Marin":{"gt30_low":99.2,"gt50_low":98.7,"gt30_high_earn":20.3,"gt50_high_earn":3.1},"Napa":{"gt30_low":100.0,"gt50_low":93.8,"gt30_high_earn":17.5,"gt50_high_earn":2.3},"San Francisco":{"gt30_low":91.0,"gt50_low":89.4,"gt30_high_earn":14.5,"gt50_high_earn":2.5},"San Mateo":{"gt30_low":100.0,"gt50_low":95.0,"gt30_high_earn":16.0,"gt50_high_earn":3.7},"Santa Clara":{"gt30_low":99.7,"gt50_low":98.7,"gt30_high_earn":16.3,"gt50_high_earn":2.8},"Solano":{"gt30_low":99.3,"gt50_low":99.0,"gt30_high_earn":13.0,"gt50_high_earn":1.4},"Sonoma":{"gt30_low":98.3,"gt50_low":98.3,"gt30_high_earn":14.5,"gt50_high_earn":1.7}},"allBurden35_2024":{"Alameda":31.7,"Contra Costa":32.5,"Marin":33.6,"Napa":32.2,"San Francisco":28.7,"San Mateo":28.3,"Santa Clara":28.6,"Solano":35.2,"Sonoma":31.6},"incomeDetail2024":{"Alameda":{"Less than $10,000":{"gt30":93.9,"gt50":91.0},"$10,000 to $20,000":{"gt30":89.6,"gt50":76.2},"$20,000 to $35,000":{"gt30":84.2,"gt50":69.1},"$35,000 to $50,000":{"gt30":76.9,"gt50":54.6},"$50,000 to $75,000":{"gt30":70.4,"gt50":32.3},"$75,000 to $100,000":{"gt30":56.0,"gt50":13.0},"$100,000 or more":{"gt30":15.7,"gt50":2.2}},"Contra Costa":{"Less than $10,000":{"gt30":98.5,"gt50":98.0},"$10,000 to $20,000":{"gt30":90.2,"gt50":76.3},"$20,000 to $35,000":{"gt30":84.4,"gt50":70.9},"$35,000 to $50,000":{"gt30":77.6,"gt50":53.5},"$50,000 to $75,000":{"gt30":72.0,"gt50":30.8},"$75,000 to $100,000":{"gt30":57.0,"gt50":12.9},"$100,000 or more":{"gt30":19.2,"gt50":3.1}},"Marin":{"Less than $10,000":{"gt30":99.2,"gt50":98.7},"$10,000 to $20,000":{"gt30":85.1,"gt50":75.0},"$20,000 to $35,000":{"gt30":80.7,"gt50":68.8},"$35,000 to $50,000":{"gt30":83.4,"gt50":57.6},"$50,000 to $75,000":{"gt30":72.5,"gt50":41.3},"$75,000 to $100,000":{"gt30":62.5,"gt50":31.2},"$100,000 or more":{"gt30":20.3,"gt50":3.1}},"Napa":{"Less than $10,000":{"gt30":100.0,"gt50":93.8},"$10,000 to $20,000":{"gt30":88.3,"gt50":77.9},"$20,000 to $35,000":{"gt30":79.9,"gt50":63.9},"$35,000 to $50,000":{"gt30":72.5,"gt50":50.2},"$50,000 to $75,000":{"gt30":64.7,"gt50":22.3},"$75,000 to $100,000":{"gt30":50.7,"gt50":12.7},"$100,000 or more":{"gt30":17.5,"gt50":2.3}},"San Francisco":{"Less than $10,000":{"gt30":91.0,"gt50":89.4},"$10,000 to $20,000":{"gt30":78.2,"gt50":59.6},"$20,000 to $35,000":{"gt30":84.4,"gt50":65.1},"$35,000 to $50,000":{"gt30":72.2,"gt50":42.7},"$50,000 to $75,000":{"gt30":61.6,"gt50":26.4},"$75,000 to $100,000":{"gt30":54.4,"gt50":13.6},"$100,000 or more":{"gt30":14.5,"gt50":2.5}},"San Mateo":{"Less than $10,000":{"gt30":100.0,"gt50":95.0},"$10,000 to $20,000":{"gt30":86.5,"gt50":71.3},"$20,000 to $35,000":{"gt30":90.3,"gt50":71.7},"$35,000 to $50,000":{"gt30":82.9,"gt50":67.0},"$50,000 to $75,000":{"gt30":71.5,"gt50":37.1},"$75,000 to $100,000":{"gt30":62.3,"gt50":16.4},"$100,000 or more":{"gt30":16.0,"gt50":3.7}},"Santa Clara":{"Less than $10,000":{"gt30":99.7,"gt50":98.7},"$10,000 to $20,000":{"gt30":90.4,"gt50":70.6},"$20,000 to $35,000":{"gt30":90.5,"gt50":68.3},"$35,000 to $50,000":{"gt30":83.4,"gt50":59.8},"$50,000 to $75,000":{"gt30":75.2,"gt50":37.0},"$75,000 to $100,000":{"gt30":63.1,"gt50":17.5},"$100,000 or more":{"gt30":16.3,"gt50":2.8}},"Solano":{"Less than $10,000":{"gt30":99.3,"gt50":99.0},"$10,000 to $20,000":{"gt30":91.2,"gt50":75.3},"$20,000 to $35,000":{"gt30":88.2,"gt50":74.0},"$35,000 to $50,000":{"gt30":73.9,"gt50":49.3},"$50,000 to $75,000":{"gt30":74.2,"gt50":28.5},"$75,000 to $100,000":{"gt30":50.9,"gt50":7.3},"$100,000 or more":{"gt30":13.0,"gt50":1.4}},"Sonoma":{"Less than $10,000":{"gt30":98.3,"gt50":98.3},"$10,000 to $20,000":{"gt30":93.9,"gt50":86.7},"$20,000 to $35,000":{"gt30":78.3,"gt50":61.8},"$35,000 to $50,000":{"gt30":77.0,"gt50":48.2},"$50,000 to $75,000":{"gt30":64.8,"gt50":28.0},"$75,000 to $100,000":{"gt30":51.8,"gt50":9.7},"$100,000 or more":{"gt30":14.5,"gt50":1.7}}}};
+
+  const ORDER = ["Sonoma", "Napa", "Solano", "Marin", "San Francisco", "Contra Costa", "San Mateo", "Alameda", "Santa Clara"];
+  const incomeBrackets = [
+    "Less than $10,000",
+    "$10,000 to $20,000",
+    "$20,000 to $35,000",
+    "$35,000 to $50,000",
+    "$50,000 to $75,000",
+    "$75,000 to $100,000",
+    "$100,000 or more",
+  ];
+
+  const mapEl = document.getElementById("countyMap");
+  const yearSlider = document.getElementById("yearSlider");
+  const yearLabel = document.getElementById("yearLabel");
+  const layerToggle = document.getElementById("layerToggle");
+  const legendBurden = document.getElementById("legendBurden");
+  const legendDelta = document.getElementById("legendDelta");
+  const legendIncome = document.getElementById("legendIncome");
+  const countyPick = document.getElementById("countyPick");
+  const incomeBars = document.getElementById("incomeBars");
+  const incomeTitle = document.getElementById("incomeTitle");
+
+  let layer = "burden";
+  let yearIdx = 0;
+  let selected = "Alameda";
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function burdenColor(pct) {
+    const t = Math.max(0, Math.min(1, (pct - 22) / 28));
+    const r = Math.round(lerp(240, 107, t));
+    const g = Math.round(lerp(240, 31, t));
+    const b = Math.round(lerp(240, 42, t));
+    return "rgb(" + r + "," + g + "," + b + ")";
+  }
+  function deltaColor(d) {
+    const t = Math.max(-12, Math.min(12, d)) / 12;
+    if (t <= 0) {
+      const u = 1 + t;
+      return "rgb(" + Math.round(lerp(230, 26, u)) + "," + Math.round(lerp(230, 77, u)) + "," + Math.round(lerp(230, 110, u)) + ")";
+    }
+    const u = t;
+    return "rgb(" + Math.round(lerp(240, 107, u)) + "," + Math.round(lerp(240, 31, u)) + "," + Math.round(lerp(240, 42, u)) + ")";
+  }
+  function incomeGapColor(co) {
+    const row = DATA.countyIncome2024[co];
+    const gap = row.gt30_low - row.gt30_high_earn;
+    const t = Math.max(0, Math.min(1, (gap - 60) / 45));
+    return burdenColor(22 + t * 28);
+  }
+
+  function renderMap() {
+    mapEl.innerHTML = "";
+    ORDER.forEach(function (co) {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "county-cell";
+      cell.dataset.county = co;
+      cell.style.textAlign = "left";
+      cell.style.cursor = "pointer";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = co;
+      const val = document.createElement("div");
+      val.className = "val";
+      cell.appendChild(name);
+      cell.appendChild(val);
+      mapEl.appendChild(cell);
+    });
+    updateMapAppearance();
+  }
+
+  function updateMapAppearance() {
+    const cells = mapEl.querySelectorAll(".county-cell");
+    cells.forEach(function (cell) {
+      const co = cell.dataset.county;
+      const valEl = cell.querySelector(".val");
+      let bg;
+      let txt;
+      if (layer === "burden") {
+        const y = DATA.renterBurden35[co][yearIdx];
+        bg = burdenColor(y);
+        txt = "Renters ≥35%: " + y + "%";
+      } else if (layer === "delta") {
+        const d = DATA.delta09_24[co];
+        bg = deltaColor(d);
+        txt = "Δ 2009→2024: " + (d > 0 ? "+" : "") + d + " pts";
+      } else {
+        bg = incomeGapColor(co);
+        const r = DATA.countyIncome2024[co];
+        txt = "Gap >30%: low income " + r.gt30_low + "% vs $100k+ " + r.gt30_high_earn + "%";
+      }
+      cell.style.background = bg;
+      valEl.textContent = txt;
+      if (co === selected) {
+        cell.style.outline = "3px solid #2c5282";
+        cell.style.outlineOffset = "-1px";
+      } else {
+        cell.style.outline = "none";
+      }
+    });
+  }
+
+  function renderIncomeBars() {
+    const detail = DATA.incomeDetail2024[selected];
+    incomeTitle.textContent = selected + " — share of households in each income band paying >30% / >50% on housing (2024)";
+    incomeBars.innerHTML = "";
+    incomeBrackets.forEach(function (ib) {
+      const row = document.createElement("div");
+      row.className = "bar-row";
+      const lab = document.createElement("span");
+      lab.textContent = ib.replace("Less than $10,000", "< $10k").replace("$100,000 or more", "$100k+");
+      const track = document.createElement("div");
+      track.className = "bar-track";
+      const fill30 = document.createElement("div");
+      fill30.className = "bar-fill";
+      fill30.style.width = detail[ib].gt30 + "%";
+      const fill50 = document.createElement("div");
+      fill50.className = "bar-fill severe";
+      fill50.style.width = detail[ib].gt50 + "%";
+      fill50.style.opacity = "0.85";
+      fill50.style.position = "absolute";
+      fill50.style.left = "0";
+      fill50.style.top = "0";
+      fill50.style.height = "100%";
+      track.style.position = "relative";
+      track.appendChild(fill30);
+      track.appendChild(fill50);
+      const pct = document.createElement("span");
+      pct.style.width = "52px";
+      pct.style.textAlign = "right";
+      pct.style.fontSize = "0.72rem";
+      pct.textContent = detail[ib].gt30 + "% / " + detail[ib].gt50 + "%";
+      row.appendChild(lab);
+      row.appendChild(track);
+      row.appendChild(pct);
+      incomeBars.appendChild(row);
+    });
+  }
+
+  DATA.counties.forEach(function (c) {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    countyPick.appendChild(opt);
+  });
+  countyPick.value = selected;
+
+  yearSlider.addEventListener("input", function () {
+    yearIdx = +yearSlider.value;
+    yearLabel.textContent = "Year: " + DATA.years[yearIdx];
+    updateMapAppearance();
+  });
+
+  layerToggle.addEventListener("click", function (e) {
+    const btn = e.target.closest("button[data-layer]");
+    if (!btn) return;
+    layer = btn.getAttribute("data-layer");
+    layerToggle.querySelectorAll("button").forEach(function (b) {
+      b.classList.toggle("active", b === btn);
+    });
+    legendBurden.style.display = layer === "burden" ? "flex" : "none";
+    legendDelta.style.display = layer === "delta" ? "flex" : "none";
+    legendIncome.style.display = layer === "income" ? "flex" : "none";
+    yearSlider.parentElement.style.display = layer === "burden" ? "block" : "none";
+    updateMapAppearance();
+  });
+
+  mapEl.addEventListener("click", function (e) {
+    const cell = e.target.closest(".county-cell");
+    if (!cell) return;
+    selected = cell.dataset.county;
+    countyPick.value = selected;
+    renderIncomeBars();
+    updateMapAppearance();
+  });
+
+  countyPick.addEventListener("change", function () {
+    selected = countyPick.value;
+    renderIncomeBars();
+    updateMapAppearance();
+  });
+
+  renderMap();
+  yearLabel.textContent = "Year: " + DATA.years[0];
+  renderIncomeBars();
+})();
+  </script>
+</body>
+</html>
